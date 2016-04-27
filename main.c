@@ -70,22 +70,28 @@ void PutsStringCPtr(char *str)
 
 unsigned char debug_flg = 0;
 char *dubug_str = "hoge\r\n";
+unsigned short gcounter = 0;
 
-#define T0CNT (65536-46875)
+#define T0CNT (65536-375)
 void interrupt_func(void)
 {
   if (INTCONbits.TMR0IF == 1) {
+    gcounter++;
     TMR0 = T0CNT;
     INTCONbits.TMR0IF = 0;
     debug_flg = 1;
-    if (PORTBbits.RB6) {
+    //if ((gcounter >> 12) & 0x1) {
+    if ((gcounter >> 0) & 0x1) {
       PORTA = 0;
       PORTB = 0;
       PORTC = 0;
+      CCPR1L  = 0x00;
     } else {
       PORTA = 0xFFFF;
       PORTB = 0xFFFF;
       PORTC = 0xFFFF;
+      //CCPR1L  = 63;
+      CCPR1L  = 1;
     }
   }
 }
@@ -102,20 +108,13 @@ void init(void)
   // timer
   // USB Bootloader では 48MHz で動作
   //
-  // 1[s] を作るには
-  // 48MHz/4 = 12MHz
-  // 1/12MHz = 0.083 [usec]
-  // 1[s]/0.083[usec] = 12 * 10**6
-  // prescaler を 1:256 なら
-  //   12 * 10**6 / 256 = 46875
-  //
-  //
-  // 48MHz/4 * x = 8kHz としたい
-  //   x = 12*1000/8 = 1500
+  // 8kHz を作るには
+  //   48MHz/4 * x = 8kHz としたい
+  //   x = (48/4)*1000/8 = 1500
   //   prescaler を 1:4 とすると 1500/4 = 375
   //
   T0CONbits.T08BIT = 0;     // 16bit timer
-  T0CONbits.T0PS = 0b111;   // prescaler 1:256
+  T0CONbits.T0PS = 0b001;   // prescaler 1:4
   T0CONbits.T0CS = 0;
   T0CONbits.PSA = 0;        // use prescaler
   T0CONbits.TMR0ON = 1;
@@ -123,7 +122,6 @@ void init(void)
   INTCON2bits.TMR0IP = 1;
   INTCONbits.TMR0IE = 1;
   INTCONbits.TMR0IF = 0;
-  //RCONbits.IPEN = 1;
   INTCONbits.GIEH = 1;
   INTCONbits.GIEL = 1;
 
@@ -133,8 +131,35 @@ void init(void)
   T1CONbits.T1CKPS = 0b11; // prescaler 1:8
   T1CONbits.RD16 = 1;      // 16bit
   T1CONbits.TMR1ON = 1;
-  //PIE1bits.TMR1IE = 1;
   PIR1bits.TMR1IF = 0;
+
+
+  // PWM settings
+  CCP1CONbits.CCP1M = 0b1100; // P1A、P1C をアクティブ High、P1B、P1D をアクティブ High
+  CCP1CONbits.DC1B  = 0b11;   // デューティ サイクル値の最下位 2 ビット
+  CCP1CONbits.P1M   = 0b00;   // シングル出力
+  PSTRCONbits.STRA = 1;
+  PSTRCONbits.STRB = 1;
+  PSTRCONbits.STRC = 1;
+  PSTRCONbits.STRD = 1;
+  PSTRCONbits.STRSYNC = 1;
+
+
+  // 8ビットのデーティー幅とする場合は PR2 が 0x3F となる
+  // 16MHz の場合
+  //   16MHz/4 = 4MHz
+  //   4MHz / (0x3F+1) = 4000kHz/64 = 62.5kHz
+  // 48HMz の場合
+  //   48MHz/4 = 12MHz
+  //   12MHz / (0x3F+1) = 12000kHz/64 = 187.5kHz
+  //CCPR1L  = 0x3F;              // デューティ値
+  CCPR1L  = 0x00;
+  PR2     = 0x3F;            // PWM周期 187.5kHz @48MHz
+
+  TMR2 = 0;
+  T2CONbits.T2CKPS = 0b00;  // prescaler 1:1
+  T2CONbits.T2OUTPS = 0;    // postscaler 1:1
+  T2CONbits.TMR2ON = 1;     // Timer ON
 }
 
 /********************************************************************
@@ -204,13 +229,13 @@ MAIN_RETURN main(void)
 
         //Application specific tasks
         APP_DeviceCDCBasicDemoTasks();
-        if (debug_flg) {
-          debug_flg = 0;
-          if (WaitToReadySerial()) {
-            PutsStringCPtr("hello world\r\n");
-            PutsStringCPtr(dubug_str);
-          }
-        }
+        //if (debug_flg) {
+        //  debug_flg = 0;
+        //  if (WaitToReadySerial()) {
+        //    PutsStringCPtr("hello world\r\n");
+        //    PutsStringCPtr(dubug_str);
+        //  }
+        //}
 
     }//end while
 }//end main
