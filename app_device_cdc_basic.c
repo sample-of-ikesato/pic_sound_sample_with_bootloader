@@ -85,6 +85,7 @@ int hangry = 0;
 int eat = 0;
 int playing = 0;
 int waiting_data = 0;
+int debug_flag = 0;
 Queue cmd_queue;
 //unsigned char cmd_queue_buffer[sizeof(queue_buffer)+2];
 unsigned char cmd_queue_buffer[CDC_DATA_OUT_EP_SIZE];
@@ -99,9 +100,19 @@ void interrupt_func(void)
     TMR0 = T0CNT;
     INTCONbits.TMR0IF = 0;
     eat = 1;
-    if (gcounter > 8000) {
+    // 1/440 = n*1/8000
+    // n = 8000/440 = 18.18
+    if (gcounter > 18) {
       gcounter = 0;
       PORTBbits.RB7 = !PORTBbits.RB7;
+      debug_flag = !debug_flag;
+      if (debug_flag) {
+        CCPR1L = 63;
+        CCP1CONbits.DC1B = 0b11;
+      } else {
+        CCPR1L = 0;
+        CCP1CONbits.DC1B = 0;
+      }
     //  PORTA = 0;
     //  PORTB = 0;
     //  PORTC = 0;
@@ -235,14 +246,14 @@ void APP_DeviceCDCBasicDemoInitialize()
 ********************************************************************/
 void APP_DeviceCDCBasicDemoTasks()
 {
-    if (eat && (queue_size(&queue) > 0)) {
-      unsigned char raw;
-      eat = 0;
-      if (queue_dequeue(&queue, &raw, 1) == 1) {
-        CCPR1L = (raw >> 2) & 0x3F;
-        CCP1CONbits.DC1B = (raw & 0x3);
-      }
-    }
+    //if (eat && (queue_size(&queue) > 0)) {
+    //  unsigned char raw;
+    //  eat = 0;
+    //  if (queue_dequeue(&queue, &raw, 1) == 1) {
+    //    CCPR1L = (raw >> 2) & 0x3F;
+    //    CCP1CONbits.DC1B = (raw & 0x3);
+    //  }
+    //}
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
      */
