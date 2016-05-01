@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "queue.h"
 
+static void queue_increment_size(Queue *q);
+
 void queue_init(Queue *queue, void *buffer, int max_size)
 {
   Queue *q = queue;
@@ -21,17 +23,18 @@ int queue_enqueue(Queue *queue, void *buffer, int size)
   unsigned char *bp = buffer;
   unsigned char *qp = q->head + q->size;
   int i;
+  int ret = 0;
 
   if (q->size + size > q->buffer_size)
-    return -1;
+    ret = -1;
   for (i=0; i<size; i++) {
     if (qp >= q->buffer + q->buffer_size) {
-      qp = q->buffer;
+      qp -= q->buffer_size;
     }
     *qp++ = *bp++;
+    queue_increment_size(q);
   }
-  q->size += size;
-  return 0;
+  return ret;
 }
 
 int queue_enqueue_from_queue(Queue *queue, Queue *other)
@@ -39,17 +42,18 @@ int queue_enqueue_from_queue(Queue *queue, Queue *other)
   Queue *q = queue;
   unsigned char *qp = q->head + q->size;
   int i;
+  int ret = 0;
 
   if (q->size + other->size > q->buffer_size)
-    return -1;
+    ret = -1;
   for (i=0; i<other->size; i++) {
     if (qp >= q->buffer + q->buffer_size) {
       qp = q->buffer;
     }
     *qp++ = queue_peek(other, i);
+    queue_increment_size(q);
   }
-  q->size += other->size;
-  return 0;
+  return ret;
 }
 
 int queue_dequeue(Queue *queue, void *buffer, int size)
@@ -95,4 +99,16 @@ void queue_clear(Queue *queue)
 {
   Queue *q = queue;
   q->size = 0;
+}
+
+static void queue_increment_size(Queue *q)
+{
+  if (q->size < q->buffer_size) {
+    q->size++;
+  } else {
+    q->head++;
+    if (q->head >= q->buffer + q->buffer_size) {
+      q->head = q->buffer;
+    }
+  }
 }
