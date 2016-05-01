@@ -91,7 +91,7 @@ unsigned char cmd_queue_buffer[CDC_DATA_OUT_EP_SIZE];
 
 
 //#define T0CNT (65536-375)
-#define T0CNT (65536-375+120)
+#define T0CNT (65536-375+117)
 void interrupt_func(void)
 {
   if (INTCONbits.TMR0IF == 1) {
