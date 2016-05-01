@@ -100,9 +100,9 @@ void interrupt_func(void)
     TMR0 = T0CNT;
     INTCONbits.TMR0IF = 0;
     eat = 1;
-    // 1/440 = n*1/8000
-    // n = 8000/440 = 18.18
-    if (gcounter > 18) {
+    // 1/(440*2) = n*1/8000
+    // n = 8000/880 = 9.09
+    if (gcounter > 9) {
       gcounter = 0;
       PORTBbits.RB7 = !PORTBbits.RB7;
       debug_flag = !debug_flag;
