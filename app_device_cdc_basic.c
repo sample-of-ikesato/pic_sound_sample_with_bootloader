@@ -28,10 +28,10 @@
 #include <stddef.h>
 
 #include "usb.h"
-
 #include "app_led_usb_status.h"
 #include "app_device_cdc_basic.h"
 #include "usb_config.h"
+#include "queue.h"
 
 /** VARIABLES ******************************************************/
 
@@ -76,30 +76,42 @@ void PutsStringCPtr(char *str)
 
 
 
-unsigned char debug_flg = 0;
-char *dubug_str = "hoge\r\n";
 unsigned short gcounter = 0;
+Queue queue;
+//static unsigned char queue_buffer[64];
+unsigned char queue_buffer[32];
+//int hangry = 1;
+int hangry = 0;
+int eat = 0;
+int playing = 0;
+int waiting_data = 0;
+Queue cmd_queue;
+//unsigned char cmd_queue_buffer[sizeof(queue_buffer)+2];
+unsigned char cmd_queue_buffer[CDC_DATA_OUT_EP_SIZE];
 
-#define T0CNT (65536-375)
+
+//#define T0CNT (65536-375)
+#define T0CNT (65536-375+120)
 void interrupt_func(void)
 {
   if (INTCONbits.TMR0IF == 1) {
     gcounter++;
     TMR0 = T0CNT;
     INTCONbits.TMR0IF = 0;
-    debug_flg = 1;
-    //if ((gcounter >> 12) & 0x1) {
-    if ((gcounter >> 0) & 0x1) {
-      PORTA = 0;
-      PORTB = 0;
-      PORTC = 0;
-      CCPR1L  = 0x00;
-    } else {
-      PORTA = 0xFFFF;
-      PORTB = 0xFFFF;
-      PORTC = 0xFFFF;
-      //CCPR1L  = 63;
-      CCPR1L  = 1;
+    eat = 1;
+    if (gcounter > 8000) {
+      gcounter = 0;
+      PORTBbits.RB7 = !PORTBbits.RB7;
+    //  PORTA = 0;
+    //  PORTB = 0;
+    //  PORTC = 0;
+    //  CCPR1L  = 0x00;
+    //} else {
+    //  PORTA = 0xFFFF;
+    //  PORTB = 0xFFFF;
+    //  PORTC = 0xFFFF;
+    //  //CCPR1L  = 63;
+    //  CCPR1L  = 1;
     }
   }
 }
@@ -110,7 +122,7 @@ void init(void)
   TRISB = 0;
   TRISC = 0;
   PORTA = 0;
-  PORTB = 0xFFFF;
+  PORTB = 0;
   PORTC = 0;
 
   // timer
@@ -168,6 +180,18 @@ void init(void)
   T2CONbits.T2CKPS = 0b00;  // prescaler 1:1
   T2CONbits.T2OUTPS = 0;    // postscaler 1:1
   T2CONbits.TMR2ON = 1;     // Timer ON
+
+  // queue
+  queue_init(&queue, queue_buffer, sizeof(queue_buffer));
+  queue_init(&cmd_queue, cmd_queue_buffer, sizeof(cmd_queue_buffer));
+}
+
+int is_ready_cmd(Queue *q)
+{
+  int qsize = queue_size(q);
+  if (qsize < 2)
+    return 0;
+  return (qsize >= queue_peek(q, 1) + 2);
 }
 
 
@@ -187,7 +211,6 @@ void APP_DeviceCDCBasicDemoInitialize()
 {
     CDCInitEP();
 
-    
     line_coding.bCharFormat = 0;
     line_coding.bDataBits = 8;
     line_coding.bParityType = 0;
@@ -212,6 +235,14 @@ void APP_DeviceCDCBasicDemoInitialize()
 ********************************************************************/
 void APP_DeviceCDCBasicDemoTasks()
 {
+    if (eat && (queue_size(&queue) > 0)) {
+      unsigned char raw;
+      eat = 0;
+      if (queue_dequeue(&queue, &raw, 1) == 1) {
+        CCPR1L = (raw >> 2) & 0x3F;
+        CCP1CONbits.DC1B = (raw & 0x3);
+      }
+    }
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
      */
@@ -244,42 +275,40 @@ void APP_DeviceCDCBasicDemoTasks()
      */
     if( USBUSARTIsTxTrfReady() == true)
     {
-        uint8_t i;
-        uint8_t numBytesRead;
-
-        numBytesRead = getsUSBUSART(readBuffer, sizeof(readBuffer));
-
-        /* For every byte that was read... */
-        for(i=0; i<numBytesRead; i++)
-        {
-            switch(readBuffer[i])
-            {
-                /* If we receive new line or line feed commands, just echo
-                 * them direct.
-                 */
-                case 0x0A:
-                case 0x0D:
-                    writeBuffer[i] = readBuffer[i];
-                    break;
-
-                /* If we receive something else, then echo it plus one
-                 * so that if we receive 'a', we echo 'b' so that the
-                 * user knows that it isn't the echo enabled on their
-                 * terminal program.
-                 */
-                default:
-                    writeBuffer[i] = readBuffer[i];
-                    break;
-            }
+      uint8_t numBytesRead;
+      //numBytesRead = getsUSBUSART(readBuffer, sizeof(readBuffer));
+      numBytesRead = getsUSBUSART(readBuffer, sizeof(cmd_queue_buffer) - queue_size(&cmd_queue));
+      queue_enqueue(&cmd_queue, readBuffer, numBytesRead);
+      if (is_ready_cmd(&cmd_queue)) {
+        unsigned char cmd = queue_peek(&cmd_queue, 0);
+        unsigned char size = queue_peek(&cmd_queue, 1);
+        queue_dequeue(&cmd_queue, NULL, 2);
+        switch(cmd) {
+        case 1: // 演奏開始
+          playing = 1;
+          break;
+        case 3: // データ転送
+          queue_enqueue_from_queue(&queue, &cmd_queue);
+          if (size == 0)
+            playing = 0;
+          waiting_data = 0;
+          break;
         }
+        queue_dequeue(&cmd_queue, NULL, size);
+      }
 
-        if(numBytesRead > 0)
-        {
-            /* After processing all of the received data, we need to send out
-             * the "echo" data now.
-             */
-            putUSBUSART(writeBuffer,numBytesRead);
+      if (playing & waiting_data == 0) {
+        if (hangry) {
+          hangry = 0;
+          waiting_data = 1;
+          writeBuffer[0] = 2;
+          writeBuffer[1] = 1;
+          writeBuffer[2] = sizeof(queue_buffer) - queue_size(&queue);
+          putUSBUSART(writeBuffer, 3);
+        } else if ((size_t)queue_size(&queue) <= (sizeof(queue_buffer)>>1)) {
+          hangry = 1;
         }
+      }
     }
 
     CDCTxService();
