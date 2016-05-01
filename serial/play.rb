@@ -43,6 +43,7 @@ start = last = Time.now
 readed = 0
 fp = File.open(fname, "rb")
 sp.write([1,0].pack("C*"))
+dfp = File.open("debug.dat", "wb")
 while true
   buf = sp.read(2)
   if buf == 0
@@ -84,6 +85,8 @@ while true
         printf("\r%02d:%02d.%03d #{readed}/#{fsize} #{rsize}", diff/60, diff%60, (diff * 1000)%1000)
       end
     end
+  elsif cmd == 9
+    dfp.write(data.pack("C*"))
   else
     puts "unrecognize command #{cmd} #{size} #{data}"
   end

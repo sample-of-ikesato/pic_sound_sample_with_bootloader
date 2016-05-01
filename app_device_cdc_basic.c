@@ -113,6 +113,20 @@ void interrupt_func(void)
     //  //CCPR1L  = 63;
     //  CCPR1L  = 1;
     }
+
+    if (queue_size(&queue) > 0) {
+      unsigned char raw;
+      raw = queue_peek(&queue, 0);
+      //CCPR1L = (raw >> 2) & 0x3F;
+      //CCP1CONbits.DC1B = (raw & 0x3);
+      if (raw) {
+        CCPR1L = 0x3F;
+        CCP1CONbits.DC1B = 0b11;
+      } else {
+        CCPR1L = 0;
+        CCP1CONbits.DC1B = 0;
+      }
+    }
   }
 }
 
@@ -233,15 +247,26 @@ void APP_DeviceCDCBasicDemoInitialize()
 * Output: None
 *
 ********************************************************************/
+int debug_flag = 0;
 void APP_DeviceCDCBasicDemoTasks()
 {
     if (eat && (queue_size(&queue) > 0)) {
-      unsigned char raw;
       eat = 0;
-      if (queue_dequeue(&queue, &raw, 1) == 1) {
-        CCPR1L = (raw >> 2) & 0x3F;
-        CCP1CONbits.DC1B = (raw & 0x3);
-      }
+      queue_dequeue(&queue, NULL, 1);
+      //debug_flag = !debug_flag;
+      //if (raw) {
+      //  CCPR1L = 0x3F;
+      //  CCP1CONbits.DC1B = 0b11;
+      //} else {
+      //  CCPR1L = 0;
+      //  CCP1CONbits.DC1B = 0;
+      //}
+      //writeBuffer[0] = 9;
+      //writeBuffer[1] = 1;
+      //writeBuffer[2] = raw;
+      //if (WaitToReadySerial())
+      //  putUSBUSART(writeBuffer, 3);
+      //WaitToReadySerial();
     }
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
