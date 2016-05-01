@@ -286,6 +286,7 @@ void APP_DeviceCDCBasicDemoTasks()
         switch(cmd) {
         case 1: // 演奏開始
           playing = 1;
+          waiting_data = 0;
           break;
         case 3: // データ転送
           queue_enqueue_from_queue(&queue, &cmd_queue);
