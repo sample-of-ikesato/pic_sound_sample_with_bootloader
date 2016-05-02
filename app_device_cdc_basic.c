@@ -213,8 +213,29 @@ void init(void)
 int is_ready_cmd(Queue *q)
 {
   int qsize = queue_size(q);
-  if (qsize < 2)
+  if (qsize < 2) {
+    if (qsize > 0)
+    {
+      writeBuffer[0] = 9;
+      writeBuffer[1] = 2;
+      writeBuffer[2] = 0xFF;
+      writeBuffer[3] = qsize;
+      if (WaitToReadySerial())
+        putUSBUSART(writeBuffer, writeBuffer[1]+2);
+      WaitToReadySerial();
+    }
     return 0;
+  }
+  {
+    if ((qsize >= queue_peek(q, 1) + 2) == false) {
+      writeBuffer[0] = 9;
+      writeBuffer[1] = 1;
+      writeBuffer[2] = 0xFE;
+      if (WaitToReadySerial())
+        putUSBUSART(writeBuffer, writeBuffer[1]+2);
+      WaitToReadySerial();
+    }
+  }
   return (qsize >= queue_peek(q, 1) + 2);
 }
 
@@ -269,14 +290,14 @@ void APP_DeviceCDCBasicDemoTasks()
       //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
       //  WaitToReadySerial();
       //}
-      {
-        writeBuffer[0] = 9;
-        writeBuffer[1] = 1;
-        writeBuffer[2] = miss;
-        if (WaitToReadySerial())
-          putUSBUSART(writeBuffer, writeBuffer[1]+2);
-        WaitToReadySerial();
-      }
+      //{
+      //  writeBuffer[0] = 9;
+      //  writeBuffer[1] = 1;
+      //  writeBuffer[2] = miss;
+      //  if (WaitToReadySerial())
+      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
+      //  WaitToReadySerial();
+      //}
       //{
       //  writeBuffer[0] = 9;
       //  writeBuffer[1] = queue_size(&queue);
