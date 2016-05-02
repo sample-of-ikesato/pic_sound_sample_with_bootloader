@@ -86,7 +86,7 @@ while true
       end
     end
   elsif cmd == 9
-    dfp.write(data.pack("C*"))
+    dfp.write(data.pack("C*")) if size > 0
   else
     puts "unrecognize command #{cmd} #{size} #{data}"
   end

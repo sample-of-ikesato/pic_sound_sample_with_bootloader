@@ -78,27 +78,30 @@ void PutsStringCPtr(char *str)
 
 unsigned short gcounter = 0;
 Queue queue;
-//static unsigned char queue_buffer[64];
-unsigned char queue_buffer[32];
+static unsigned char queue_buffer[48];
+//unsigned char queue_buffer[32];
 //int hangry = 1;
 int hangry = 0;
-int eat = 0;
+int eaten = 0;
+unsigned char eated_raw = 0;
 int playing = 0;
 int waiting_data = 0;
+int miss = 0;
 Queue cmd_queue;
-//unsigned char cmd_queue_buffer[sizeof(queue_buffer)+2];
-unsigned char cmd_queue_buffer[CDC_DATA_OUT_EP_SIZE];
+unsigned char cmd_queue_buffer[sizeof(queue_buffer)+2];
+//unsigned char cmd_queue_buffer[CDC_DATA_OUT_EP_SIZE];
+Queue debug_queue;
+unsigned char debug_queue_buffer[32];
 
 
-//#define T0CNT (65536-375)
-#define T0CNT (65536-375+117)
+#define T0CNT (65536-375)
+//#define T0CNT (65536-375+117)
 void interrupt_func(void)
 {
   if (INTCONbits.TMR0IF == 1) {
     gcounter++;
     TMR0 = T0CNT;
     INTCONbits.TMR0IF = 0;
-    eat = 1;
     if (gcounter > 8000) {
       gcounter = 0;
       PORTBbits.RB7 = !PORTBbits.RB7;
@@ -114,18 +117,24 @@ void interrupt_func(void)
     //  CCPR1L  = 1;
     }
 
-    if (queue_size(&queue) > 0) {
+    if (queue_size(&queue) - eaten > 0) {
       unsigned char raw;
-      raw = queue_peek(&queue, 0);
-      //CCPR1L = (raw >> 2) & 0x3F;
-      //CCP1CONbits.DC1B = (raw & 0x3);
-      if (raw) {
-        CCPR1L = 0x3F;
-        CCP1CONbits.DC1B = 0b11;
-      } else {
-        CCPR1L = 0;
-        CCP1CONbits.DC1B = 0;
-      }
+      raw = queue_peek(&queue, eaten);
+      eaten++;
+      queue_enqueue(&debug_queue, &raw, 1);
+      CCPR1L = (raw >> 2) & 0x3F;
+      CCP1CONbits.DC1B = (raw & 0x3);
+      //if (raw) {
+      //  CCPR1L = 0x3F;
+      //  CCP1CONbits.DC1B = 0b11;
+      //} else {
+      //  CCPR1L = 0;
+      //  CCP1CONbits.DC1B = 0;
+      //}
+      //} else {
+      //miss++;
+      if (raw != 0xFF && raw != 0)
+        miss++;
     }
   }
 }
@@ -198,6 +207,7 @@ void init(void)
   // queue
   queue_init(&queue, queue_buffer, sizeof(queue_buffer));
   queue_init(&cmd_queue, cmd_queue_buffer, sizeof(cmd_queue_buffer));
+  queue_init(&debug_queue, debug_queue_buffer, sizeof(debug_queue_buffer));
 }
 
 int is_ready_cmd(Queue *q)
@@ -250,9 +260,33 @@ void APP_DeviceCDCBasicDemoInitialize()
 int debug_flag = 0;
 void APP_DeviceCDCBasicDemoTasks()
 {
-    if (eat && (queue_size(&queue) > 0)) {
-      eat = 0;
-      queue_dequeue(&queue, NULL, 1);
+    if (eaten && (queue_size(&queue) > 0)) {
+      //{
+      //  writeBuffer[0] = 9;
+      //  writeBuffer[1] = 1;
+      //  writeBuffer[2] = eaten;
+      //  if (WaitToReadySerial())
+      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
+      //  WaitToReadySerial();
+      //}
+      {
+        writeBuffer[0] = 9;
+        writeBuffer[1] = 1;
+        writeBuffer[2] = miss;
+        if (WaitToReadySerial())
+          putUSBUSART(writeBuffer, writeBuffer[1]+2);
+        WaitToReadySerial();
+      }
+      //{
+      //  writeBuffer[0] = 9;
+      //  writeBuffer[1] = queue_size(&queue);
+      //  queue_dequeue(&queue, &writeBuffer[2], writeBuffer[1]);
+      //  if (WaitToReadySerial())
+      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
+      //  WaitToReadySerial();
+      //}
+      queue_dequeue(&queue, NULL, eaten);
+      eaten = 0;
       //debug_flag = !debug_flag;
       //if (raw) {
       //  CCPR1L = 0x3F;
@@ -261,12 +295,17 @@ void APP_DeviceCDCBasicDemoTasks()
       //  CCPR1L = 0;
       //  CCP1CONbits.DC1B = 0;
       //}
-      //writeBuffer[0] = 9;
-      //writeBuffer[1] = 1;
-      //writeBuffer[2] = raw;
-      //if (WaitToReadySerial())
-      //  putUSBUSART(writeBuffer, 3);
-      //WaitToReadySerial();
+
+      //{
+      //  writeBuffer[0] = 9;
+      //  //writeBuffer[1] = 1;
+      //  writeBuffer[1] = queue_size(&debug_queue);
+      //  queue_dequeue(&debug_queue, &writeBuffer[2], writeBuffer[1]);
+      //  queue_clear(&debug_queue);
+      //  if (WaitToReadySerial())
+      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
+      //  WaitToReadySerial();
+      //}
     }
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
@@ -320,19 +359,24 @@ void APP_DeviceCDCBasicDemoTasks()
           waiting_data = 0;
           break;
         }
+        //{
+        //  writeBuffer[0] = 9;
+        //  writeBuffer[1] = queue_size(&cmd_queue);
+        //  queue_dequeue(&cmd_queue, &writeBuffer[2], size);
+        //  if (WaitToReadySerial())
+        //    putUSBUSART(writeBuffer, size+2);
+        //  WaitToReadySerial();
+        //}
         queue_dequeue(&cmd_queue, NULL, size);
       }
 
       if (playing & waiting_data == 0) {
-        if (hangry) {
-          hangry = 0;
+        if ((size_t)queue_size(&queue) <= (sizeof(queue_buffer)*3/4)) {
           waiting_data = 1;
           writeBuffer[0] = 2;
           writeBuffer[1] = 1;
           writeBuffer[2] = sizeof(queue_buffer) - queue_size(&queue);
           putUSBUSART(writeBuffer, 3);
-        } else if ((size_t)queue_size(&queue) <= (sizeof(queue_buffer)>>1)) {
-          hangry = 1;
         }
       }
     }
