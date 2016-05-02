@@ -48,7 +48,7 @@ int queue_enqueue_from_queue(Queue *queue, Queue *other)
     ret = -1;
   for (i=0; i<other->size; i++) {
     if (qp >= q->buffer + q->buffer_size) {
-      qp = q->buffer;
+      qp -= q->buffer_size;
     }
     *qp++ = queue_peek(other, i);
     queue_increment_size(q);

@@ -78,7 +78,8 @@ void PutsStringCPtr(char *str)
 
 unsigned short gcounter = 0;
 Queue queue;
-static unsigned char queue_buffer[48];
+static unsigned char queue_buffer[64];
+//static unsigned char queue_buffer[16];
 //unsigned char queue_buffer[32];
 //int hangry = 1;
 int hangry = 0;
@@ -87,9 +88,13 @@ unsigned char eated_raw = 0;
 int playing = 0;
 int waiting_data = 0;
 int miss = 0;
-Queue cmd_queue;
-unsigned char cmd_queue_buffer[sizeof(queue_buffer)+2];
-//unsigned char cmd_queue_buffer[CDC_DATA_OUT_EP_SIZE];
+unsigned char sequence = 0;
+int wrong = 0;
+int last_wrong = 0;
+unsigned char wrong_actual = 0;
+unsigned char wrong_expected = 0;
+unsigned char wrong_eaten = 0;
+unsigned char wrong_qsize = 0;
 Queue debug_queue;
 unsigned char debug_queue_buffer[32];
 
@@ -120,6 +125,16 @@ void interrupt_func(void)
     if (queue_size(&queue) - eaten > 0) {
       unsigned char raw;
       raw = queue_peek(&queue, eaten);
+      if (raw != sequence) {
+        wrong++;
+        wrong_actual = raw;
+        wrong_expected = sequence;
+        wrong_eaten = eaten;
+        wrong_qsize = queue_size(&queue);
+        sequence = raw + 1;
+      } else {
+        sequence++;
+      }
       eaten++;
       queue_enqueue(&debug_queue, &raw, 1);
       CCPR1L = (raw >> 2) & 0x3F;
@@ -158,6 +173,7 @@ void init(void)
   //
   T0CONbits.T08BIT = 0;     // 16bit timer
   T0CONbits.T0PS = 0b001;   // prescaler 1:4
+  //T0CONbits.T0PS = 0b111;   // prescaler 1:256
   T0CONbits.T0CS = 0;
   T0CONbits.PSA = 0;        // use prescaler
   T0CONbits.TMR0ON = 1;
@@ -206,39 +222,8 @@ void init(void)
 
   // queue
   queue_init(&queue, queue_buffer, sizeof(queue_buffer));
-  queue_init(&cmd_queue, cmd_queue_buffer, sizeof(cmd_queue_buffer));
   queue_init(&debug_queue, debug_queue_buffer, sizeof(debug_queue_buffer));
 }
-
-int is_ready_cmd(Queue *q)
-{
-  int qsize = queue_size(q);
-  if (qsize < 2) {
-    //if (qsize > 0)
-    //{
-    //  writeBuffer[0] = 9;
-    //  writeBuffer[1] = 2;
-    //  writeBuffer[2] = 0xFF;
-    //  writeBuffer[3] = qsize;
-    //  if (WaitToReadySerial())
-    //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
-    //  WaitToReadySerial();
-    //}
-    return 0;
-  }
-  //{
-  //  if ((qsize >= queue_peek(q, 1) + 2) == false) {
-  //    writeBuffer[0] = 9;
-  //    writeBuffer[1] = 1;
-  //    writeBuffer[2] = 0xFE;
-  //    if (WaitToReadySerial())
-  //      putUSBUSART(writeBuffer, writeBuffer[1]+2);
-  //    WaitToReadySerial();
-  //  }
-  //}
-  return (qsize >= queue_peek(q, 1) + 2);
-}
-
 
 /*********************************************************************
 * Function: void APP_DeviceCDCBasicDemoInitialize(void);
@@ -281,6 +266,26 @@ void APP_DeviceCDCBasicDemoInitialize()
 int debug_flag = 0;
 void APP_DeviceCDCBasicDemoTasks()
 {
+    {
+      if (last_wrong != wrong) {
+        writeBuffer[0] = 9;
+        writeBuffer[1] = 6+16;
+        writeBuffer[2] = wrong;
+        writeBuffer[3] = wrong_actual;
+        writeBuffer[4] = wrong_expected;
+        writeBuffer[5] = wrong_eaten;
+        writeBuffer[6] = wrong_qsize;
+        writeBuffer[7] = queue_size(&queue);
+
+        for (int i=0; i<16; i++)
+          writeBuffer[i+8] = queue_buffer[i];
+
+        last_wrong = wrong;
+        if (WaitToReadySerial())
+          putUSBUSART(writeBuffer, writeBuffer[1]+2);
+        WaitToReadySerial();
+      }
+    }
     if (eaten && (queue_size(&queue) > 0)) {
       //{
       //  writeBuffer[0] = 9;
@@ -328,6 +333,8 @@ void APP_DeviceCDCBasicDemoTasks()
       //  WaitToReadySerial();
       //}
     }
+
+
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
      */
@@ -361,34 +368,22 @@ void APP_DeviceCDCBasicDemoTasks()
     if( USBUSARTIsTxTrfReady() == true)
     {
       uint8_t numBytesRead;
-      //numBytesRead = getsUSBUSART(readBuffer, sizeof(readBuffer));
-      numBytesRead = getsUSBUSART(readBuffer, sizeof(cmd_queue_buffer) - queue_size(&cmd_queue));
-      if (numBytesRead > 0) {
-        queue_enqueue(&cmd_queue, readBuffer, numBytesRead);
-        unsigned char cmd = queue_peek(&cmd_queue, 0);
-        unsigned char size = queue_peek(&cmd_queue, 1);
-        queue_dequeue(&cmd_queue, NULL, 2);
+      numBytesRead = getsUSBUSART(readBuffer, sizeof(readBuffer));
+      if (numBytesRead >= 2) {
+        unsigned char cmd = readBuffer[0];
+        unsigned char size = readBuffer[1];
         switch(cmd) {
         case 1: // 演奏開始
           playing = 1;
           waiting_data = 0;
           break;
         case 3: // データ転送
-          queue_enqueue_from_queue(&queue, &cmd_queue);
+          queue_enqueue(&queue, &readBuffer[2], size);
           if (size == 0)
             playing = 0;
           waiting_data = 0;
           break;
         }
-        //{
-        //  writeBuffer[0] = 9;
-        //  writeBuffer[1] = queue_size(&cmd_queue);
-        //  queue_dequeue(&cmd_queue, &writeBuffer[2], size);
-        //  if (WaitToReadySerial())
-        //    putUSBUSART(writeBuffer, size+2);
-        //  WaitToReadySerial();
-        //}
-        queue_dequeue(&cmd_queue, NULL, size);
       }
 
       if (playing & waiting_data == 0) {
