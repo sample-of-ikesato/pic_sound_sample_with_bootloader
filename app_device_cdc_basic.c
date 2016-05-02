@@ -214,28 +214,28 @@ int is_ready_cmd(Queue *q)
 {
   int qsize = queue_size(q);
   if (qsize < 2) {
-    if (qsize > 0)
-    {
-      writeBuffer[0] = 9;
-      writeBuffer[1] = 2;
-      writeBuffer[2] = 0xFF;
-      writeBuffer[3] = qsize;
-      if (WaitToReadySerial())
-        putUSBUSART(writeBuffer, writeBuffer[1]+2);
-      WaitToReadySerial();
-    }
+    //if (qsize > 0)
+    //{
+    //  writeBuffer[0] = 9;
+    //  writeBuffer[1] = 2;
+    //  writeBuffer[2] = 0xFF;
+    //  writeBuffer[3] = qsize;
+    //  if (WaitToReadySerial())
+    //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
+    //  WaitToReadySerial();
+    //}
     return 0;
   }
-  {
-    if ((qsize >= queue_peek(q, 1) + 2) == false) {
-      writeBuffer[0] = 9;
-      writeBuffer[1] = 1;
-      writeBuffer[2] = 0xFE;
-      if (WaitToReadySerial())
-        putUSBUSART(writeBuffer, writeBuffer[1]+2);
-      WaitToReadySerial();
-    }
-  }
+  //{
+  //  if ((qsize >= queue_peek(q, 1) + 2) == false) {
+  //    writeBuffer[0] = 9;
+  //    writeBuffer[1] = 1;
+  //    writeBuffer[2] = 0xFE;
+  //    if (WaitToReadySerial())
+  //      putUSBUSART(writeBuffer, writeBuffer[1]+2);
+  //    WaitToReadySerial();
+  //  }
+  //}
   return (qsize >= queue_peek(q, 1) + 2);
 }
 
@@ -363,8 +363,8 @@ void APP_DeviceCDCBasicDemoTasks()
       uint8_t numBytesRead;
       //numBytesRead = getsUSBUSART(readBuffer, sizeof(readBuffer));
       numBytesRead = getsUSBUSART(readBuffer, sizeof(cmd_queue_buffer) - queue_size(&cmd_queue));
-      queue_enqueue(&cmd_queue, readBuffer, numBytesRead);
-      if (is_ready_cmd(&cmd_queue)) {
+      if (numBytesRead > 0) {
+        queue_enqueue(&cmd_queue, readBuffer, numBytesRead);
         unsigned char cmd = queue_peek(&cmd_queue, 0);
         unsigned char size = queue_peek(&cmd_queue, 1);
         queue_dequeue(&cmd_queue, NULL, 2);
