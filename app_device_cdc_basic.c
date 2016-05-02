@@ -78,18 +78,12 @@ void PutsStringCPtr(char *str)
 
 unsigned short gcounter = 0;
 Queue queue;
-static unsigned char queue_buffer[48];
-//unsigned char queue_buffer[32];
-//int hangry = 1;
-int hangry = 0;
+static unsigned char queue_buffer[32];
 int eaten = 0;
 unsigned char eated_raw = 0;
 int playing = 0;
 int waiting_data = 0;
 int miss = 0;
-Queue cmd_queue;
-unsigned char cmd_queue_buffer[sizeof(queue_buffer)+2];
-//unsigned char cmd_queue_buffer[CDC_DATA_OUT_EP_SIZE];
 Queue debug_queue;
 unsigned char debug_queue_buffer[32];
 
@@ -206,39 +200,8 @@ void init(void)
 
   // queue
   queue_init(&queue, queue_buffer, sizeof(queue_buffer));
-  queue_init(&cmd_queue, cmd_queue_buffer, sizeof(cmd_queue_buffer));
   queue_init(&debug_queue, debug_queue_buffer, sizeof(debug_queue_buffer));
 }
-
-int is_ready_cmd(Queue *q)
-{
-  int qsize = queue_size(q);
-  if (qsize < 2) {
-    //if (qsize > 0)
-    //{
-    //  writeBuffer[0] = 9;
-    //  writeBuffer[1] = 2;
-    //  writeBuffer[2] = 0xFF;
-    //  writeBuffer[3] = qsize;
-    //  if (WaitToReadySerial())
-    //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
-    //  WaitToReadySerial();
-    //}
-    return 0;
-  }
-  //{
-  //  if ((qsize >= queue_peek(q, 1) + 2) == false) {
-  //    writeBuffer[0] = 9;
-  //    writeBuffer[1] = 1;
-  //    writeBuffer[2] = 0xFE;
-  //    if (WaitToReadySerial())
-  //      putUSBUSART(writeBuffer, writeBuffer[1]+2);
-  //    WaitToReadySerial();
-  //  }
-  //}
-  return (qsize >= queue_peek(q, 1) + 2);
-}
-
 
 /*********************************************************************
 * Function: void APP_DeviceCDCBasicDemoInitialize(void);
@@ -361,34 +324,20 @@ void APP_DeviceCDCBasicDemoTasks()
     if( USBUSARTIsTxTrfReady() == true)
     {
       uint8_t numBytesRead;
-      //numBytesRead = getsUSBUSART(readBuffer, sizeof(readBuffer));
-      numBytesRead = getsUSBUSART(readBuffer, sizeof(cmd_queue_buffer) - queue_size(&cmd_queue));
+      numBytesRead = getsUSBUSART(readBuffer, sizeof(readBuffer));
       if (numBytesRead > 0) {
-        queue_enqueue(&cmd_queue, readBuffer, numBytesRead);
-        unsigned char cmd = queue_peek(&cmd_queue, 0);
-        unsigned char size = queue_peek(&cmd_queue, 1);
-        queue_dequeue(&cmd_queue, NULL, 2);
-        switch(cmd) {
+        switch(readBuffer[0]) {
         case 1: // 演奏開始
           playing = 1;
           waiting_data = 0;
           break;
         case 3: // データ転送
-          queue_enqueue_from_queue(&queue, &cmd_queue);
-          if (size == 0)
+          queue_enqueue(&queue, &readBuffer[2], readBuffer[1]);
+          if (readBuffer[1] == 0)
             playing = 0;
           waiting_data = 0;
           break;
         }
-        //{
-        //  writeBuffer[0] = 9;
-        //  writeBuffer[1] = queue_size(&cmd_queue);
-        //  queue_dequeue(&cmd_queue, &writeBuffer[2], size);
-        //  if (WaitToReadySerial())
-        //    putUSBUSART(writeBuffer, size+2);
-        //  WaitToReadySerial();
-        //}
-        queue_dequeue(&cmd_queue, NULL, size);
       }
 
       if (playing & waiting_data == 0) {
