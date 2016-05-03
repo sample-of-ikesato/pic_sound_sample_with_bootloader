@@ -119,9 +119,9 @@ void interrupt_func(void)
     //  CCPR1L  = 1;
     }
 
-    if (queue_size(&queue) - eaten > 0) {
+    if (queue_size(&queue) > 0) {
       unsigned char raw;
-      raw = queue_peek(&queue, eaten);
+      queue_dequeue(&queue, &raw, 1);
       if (raw != sequence) {
         wrong++;
         debug_buffer[0] = wrong;
@@ -301,7 +301,6 @@ void APP_DeviceCDCBasicDemoTasks()
       //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
       //  WaitToReadySerial();
       //}
-      eaten -= queue_dequeue(&queue, NULL, eaten);
       //debug_flag = !debug_flag;
       //if (raw) {
       //  CCPR1L = 0x3F;
