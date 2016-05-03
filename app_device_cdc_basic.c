@@ -78,14 +78,21 @@ void PutsStringCPtr(char *str)
 
 unsigned short gcounter = 0;
 Queue queue;
-static unsigned char queue_buffer[32];
+//static unsigned char queue_buffer[64];
+//static unsigned char queue_buffer[32];
+static unsigned char queue_buffer[16];
+//unsigned char queue_buffer[32];
+//int hangry = 1;
+int hangry = 0;
 int eaten = 0;
 unsigned char eated_raw = 0;
 int playing = 0;
 int waiting_data = 0;
 int miss = 0;
-Queue debug_queue;
-unsigned char debug_queue_buffer[32];
+int wrong = 0;
+int last_wrong = 0;
+unsigned char debug_buffer[32]; // size needs bigger than queue_buffer
+int debug_buffer_size = 0;
 
 
 #define T0CNT (65536-375)
@@ -111,11 +118,9 @@ void interrupt_func(void)
     //  CCPR1L  = 1;
     }
 
-    if (queue_size(&queue) - eaten > 0) {
+    if (queue_size(&queue) > 0) {
       unsigned char raw;
-      raw = queue_peek(&queue, eaten);
-      eaten++;
-      queue_enqueue(&debug_queue, &raw, 1);
+      queue_dequeue(&queue, &raw, 1);
       CCPR1L = (raw >> 2) & 0x3F;
       CCP1CONbits.DC1B = (raw & 0x3);
       //if (raw) {
@@ -152,6 +157,7 @@ void init(void)
   //
   T0CONbits.T08BIT = 0;     // 16bit timer
   T0CONbits.T0PS = 0b001;   // prescaler 1:4
+  //T0CONbits.T0PS = 0b111;   // prescaler 1:256
   T0CONbits.T0CS = 0;
   T0CONbits.PSA = 0;        // use prescaler
   T0CONbits.TMR0ON = 1;
@@ -200,7 +206,6 @@ void init(void)
 
   // queue
   queue_init(&queue, queue_buffer, sizeof(queue_buffer));
-  queue_init(&debug_queue, debug_queue_buffer, sizeof(debug_queue_buffer));
 }
 
 /*********************************************************************
@@ -244,53 +249,18 @@ void APP_DeviceCDCBasicDemoInitialize()
 int debug_flag = 0;
 void APP_DeviceCDCBasicDemoTasks()
 {
-    if (eaten && (queue_size(&queue) > 0)) {
-      //{
-      //  writeBuffer[0] = 9;
-      //  writeBuffer[1] = 1;
-      //  writeBuffer[2] = eaten;
-      //  if (WaitToReadySerial())
-      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
-      //  WaitToReadySerial();
-      //}
-      //{
-      //  writeBuffer[0] = 9;
-      //  writeBuffer[1] = 1;
-      //  writeBuffer[2] = miss;
-      //  if (WaitToReadySerial())
-      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
-      //  WaitToReadySerial();
-      //}
-      //{
-      //  writeBuffer[0] = 9;
-      //  writeBuffer[1] = queue_size(&queue);
-      //  queue_dequeue(&queue, &writeBuffer[2], writeBuffer[1]);
-      //  if (WaitToReadySerial())
-      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
-      //  WaitToReadySerial();
-      //}
-      queue_dequeue(&queue, NULL, eaten);
-      eaten = 0;
-      //debug_flag = !debug_flag;
-      //if (raw) {
-      //  CCPR1L = 0x3F;
-      //  CCP1CONbits.DC1B = 0b11;
-      //} else {
-      //  CCPR1L = 0;
-      //  CCP1CONbits.DC1B = 0;
-      //}
-
-      //{
-      //  writeBuffer[0] = 9;
-      //  //writeBuffer[1] = 1;
-      //  writeBuffer[1] = queue_size(&debug_queue);
-      //  queue_dequeue(&debug_queue, &writeBuffer[2], writeBuffer[1]);
-      //  queue_clear(&debug_queue);
-      //  if (WaitToReadySerial())
-      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
-      //  WaitToReadySerial();
-      //}
+    {
+      if (last_wrong != wrong) {
+        writeBuffer[0] = 9;
+        writeBuffer[1] = debug_buffer_size;
+        memcpy(&writeBuffer[2], debug_buffer, debug_buffer_size);
+        last_wrong = wrong;
+        if (WaitToReadySerial())
+          putUSBUSART(writeBuffer, writeBuffer[1]+2);
+        WaitToReadySerial();
+      }
     }
+
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
      */
@@ -345,7 +315,7 @@ void APP_DeviceCDCBasicDemoTasks()
           waiting_data = 1;
           writeBuffer[0] = 2;
           writeBuffer[1] = 1;
-          writeBuffer[2] = sizeof(queue_buffer) - queue_size(&queue);
+          writeBuffer[2] = sizeof(queue_buffer) - queue_size(&queue) - 1;
           putUSBUSART(writeBuffer, 3);
         }
       }
