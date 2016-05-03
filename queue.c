@@ -18,45 +18,37 @@ int queue_size(Queue *q)
 int queue_enqueue(Queue *q, void *buffer, int size)
 {
   unsigned char *bp = buffer;
-  unsigned char *qp = q->head;
   int i;
   int ret = 0;
 
   if (q->size + size > q->buffer_size)
     ret = -1;
   for (i=0; i<size; i++) {
-    if (qp >= q->buffer + q->buffer_size) {
-      qp -= q->buffer_size;
+    if (q->head >= q->buffer + q->buffer_size) {
+      q->head -= q->buffer_size;
     }
-    *qp++ = *bp++;
+    *q->head++ = *bp++;
+    if (q->size < q->buffer_size)
+      q->size++;
   }
-  if (q->size + size > q->buffer_size)
-    q->size = q->buffer_size;
-  else
-    q->size += size;
-  q->head = qp;
   return ret;
 }
 
 int queue_enqueue_from_queue(Queue *q, Queue *other)
 {
-  unsigned char *qp = q->head;
   int i;
   int ret = 0;
 
   if (q->size + other->size > q->buffer_size)
     ret = -1;
   for (i=0; i<other->size; i++) {
-    if (qp >= q->buffer + q->buffer_size) {
-      qp -= q->buffer_size;
+    if (q->head >= q->buffer + q->buffer_size) {
+      q->head -= q->buffer_size;
     }
-    *qp++ = queue_peek(other, i);
+    *q->head++ = queue_peek(other, i);
+    if (q->size < q->buffer_size)
+      q->size++;
   }
-  if (q->size + other->size > q->buffer_size)
-    q->size = q->buffer_size;
-  else
-    q->size += other->size;
-  q->head = qp;
   return ret;
 }
 
