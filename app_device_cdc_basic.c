@@ -78,8 +78,9 @@ void PutsStringCPtr(char *str)
 
 unsigned short gcounter = 0;
 Queue queue;
-static unsigned char queue_buffer[64];
-//static unsigned char queue_buffer[16];
+//static unsigned char queue_buffer[64];
+//static unsigned char queue_buffer[32];
+static unsigned char queue_buffer[16];
 //unsigned char queue_buffer[32];
 //int hangry = 1;
 int hangry = 0;
@@ -91,12 +92,8 @@ int miss = 0;
 unsigned char sequence = 0;
 int wrong = 0;
 int last_wrong = 0;
-unsigned char wrong_actual = 0;
-unsigned char wrong_expected = 0;
-unsigned char wrong_eaten = 0;
-unsigned char wrong_qsize = 0;
-Queue debug_queue;
-unsigned char debug_queue_buffer[32];
+unsigned char debug_buffer[32]; // size needs bigger than queue_buffer
+int debug_buffer_size = 0;
 
 
 #define T0CNT (65536-375)
@@ -127,16 +124,19 @@ void interrupt_func(void)
       raw = queue_peek(&queue, eaten);
       if (raw != sequence) {
         wrong++;
-        wrong_actual = raw;
-        wrong_expected = sequence;
-        wrong_eaten = eaten;
-        wrong_qsize = queue_size(&queue);
+        debug_buffer[0] = wrong;
+        debug_buffer[1] = raw;
+        debug_buffer[2] = sequence;
+        debug_buffer[3] = eaten;
+        debug_buffer[4] = queue_size(&queue);
+        debug_buffer[5] = queue.head - queue.buffer;
+        memcpy(&debug_buffer[6], queue_buffer, sizeof(queue_buffer));
+        debug_buffer_size = 6 + sizeof(queue_buffer);
         sequence = raw + 1;
       } else {
         sequence++;
       }
       eaten++;
-      queue_enqueue(&debug_queue, &raw, 1);
       CCPR1L = (raw >> 2) & 0x3F;
       CCP1CONbits.DC1B = (raw & 0x3);
       //if (raw) {
@@ -222,7 +222,6 @@ void init(void)
 
   // queue
   queue_init(&queue, queue_buffer, sizeof(queue_buffer));
-  queue_init(&debug_queue, debug_queue_buffer, sizeof(debug_queue_buffer));
 }
 
 /*********************************************************************
@@ -269,17 +268,8 @@ void APP_DeviceCDCBasicDemoTasks()
     {
       if (last_wrong != wrong) {
         writeBuffer[0] = 9;
-        writeBuffer[1] = 6+16;
-        writeBuffer[2] = wrong;
-        writeBuffer[3] = wrong_actual;
-        writeBuffer[4] = wrong_expected;
-        writeBuffer[5] = wrong_eaten;
-        writeBuffer[6] = wrong_qsize;
-        writeBuffer[7] = queue_size(&queue);
-
-        for (int i=0; i<16; i++)
-          writeBuffer[i+8] = queue_buffer[i];
-
+        writeBuffer[1] = debug_buffer_size;
+        memcpy(&writeBuffer[2], debug_buffer, debug_buffer_size);
         last_wrong = wrong;
         if (WaitToReadySerial())
           putUSBUSART(writeBuffer, writeBuffer[1]+2);
@@ -320,17 +310,6 @@ void APP_DeviceCDCBasicDemoTasks()
       //} else {
       //  CCPR1L = 0;
       //  CCP1CONbits.DC1B = 0;
-      //}
-
-      //{
-      //  writeBuffer[0] = 9;
-      //  //writeBuffer[1] = 1;
-      //  writeBuffer[1] = queue_size(&debug_queue);
-      //  queue_dequeue(&debug_queue, &writeBuffer[2], writeBuffer[1]);
-      //  queue_clear(&debug_queue);
-      //  if (WaitToReadySerial())
-      //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
-      //  WaitToReadySerial();
       //}
     }
 
