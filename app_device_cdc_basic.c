@@ -301,8 +301,7 @@ void APP_DeviceCDCBasicDemoTasks()
       //    putUSBUSART(writeBuffer, writeBuffer[1]+2);
       //  WaitToReadySerial();
       //}
-      queue_dequeue(&queue, NULL, eaten);
-      eaten = 0;
+      eaten -= queue_dequeue(&queue, NULL, eaten);
       //debug_flag = !debug_flag;
       //if (raw) {
       //  CCPR1L = 0x3F;
