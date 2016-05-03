@@ -368,7 +368,7 @@ void APP_DeviceCDCBasicDemoTasks()
           waiting_data = 1;
           writeBuffer[0] = 2;
           writeBuffer[1] = 1;
-          writeBuffer[2] = sizeof(queue_buffer) - queue_size(&queue);
+          writeBuffer[2] = sizeof(queue_buffer) - queue_size(&queue) - 1;
           putUSBUSART(writeBuffer, 3);
         }
       }

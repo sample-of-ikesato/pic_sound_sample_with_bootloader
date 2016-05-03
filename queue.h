@@ -2,16 +2,16 @@
 #define _queue_h_
 
 typedef struct Queue_t {
-  unsigned char *head;
+  unsigned char *head;  // enqueue position
+  unsigned char *tail;  // dequeue position
   unsigned char *buffer;
-  int buffer_size;
-  int size;
+  int buffer_size;      // need store size + 1
 } Queue;
 
 // initilize Queue object
 void queue_init(Queue *queue, void *buffer, int max_size);
 
-// get current queue size
+// get current queue size, less equal than buffer_size-1
 int queue_size(Queue *queue);
 
 // enqueu buffer
@@ -21,10 +21,6 @@ int queue_enqueue(Queue *queue, void *buffer, int size);
 // dequeue buffer
 // return readed buffer size (less than argument size)
 int queue_dequeue(Queue *queue, void *buffer, int size);
-
-// enqueu from queue
-// return 0:success -1:buffer over flow
-int queue_enqueue_from_queue(Queue *queue, Queue *other);
 
 // peek queue
 // return queue data
