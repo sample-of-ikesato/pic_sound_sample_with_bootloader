@@ -78,11 +78,7 @@ void PutsStringCPtr(char *str)
 
 unsigned short gcounter = 0;
 Queue queue;
-//static unsigned char queue_buffer[64];
-//static unsigned char queue_buffer[32];
-static unsigned char queue_buffer[16];
-//unsigned char queue_buffer[32];
-//int hangry = 1;
+static unsigned char queue_buffer[32];
 int hangry = 0;
 int eaten = 0;
 unsigned char eated_raw = 0;
@@ -96,7 +92,6 @@ int debug_buffer_size = 0;
 
 
 #define T0CNT (65536-375)
-//#define T0CNT (65536-375+117)
 void interrupt_func(void)
 {
   if (INTCONbits.TMR0IF == 1) {
