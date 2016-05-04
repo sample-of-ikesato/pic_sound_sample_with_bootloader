@@ -80,7 +80,7 @@ unsigned short gcounter = 0;
 Queue queue;
 //static unsigned char queue_buffer[64];
 //static unsigned char queue_buffer[32];
-static unsigned char queue_buffer[16];
+static unsigned char queue_buffer[32];
 //unsigned char queue_buffer[32];
 //int hangry = 1;
 int hangry = 0;
