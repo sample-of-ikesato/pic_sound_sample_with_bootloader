@@ -93,16 +93,7 @@ void interrupt_func(void)
     if (gcounter > 8000) {
       gcounter = 0;
       PORTBbits.RB7 = !PORTBbits.RB7;
-    //  PORTA = 0;
-    //  PORTB = 0;
-    //  PORTC = 0;
-    //  CCPR1L  = 0x00;
-    //} else {
-    //  PORTA = 0xFFFF;
-    //  PORTB = 0xFFFF;
-    //  PORTC = 0xFFFF;
-    //  //CCPR1L  = 63;
-    //  CCPR1L  = 1;
+      PORTCbits.RC2 = !PORTCbits.RC2;
     }
   }
 }
@@ -148,7 +139,8 @@ void init(void)
 
 
   // PWM settings
-  CCP1CONbits.CCP1M = 0b1100; // P1A、P1C をアクティブ High、P1B、P1D をアクティブ High
+  CCP1CONbits.CCP1M = 0b0000; // PWM off
+//CCP1CONbits.CCP1M = 0b1100; // P1A、P1C をアクティブ High、P1B、P1D をアクティブ High
   CCP1CONbits.DC1B  = 0b11;   // デューティ サイクル値の最下位 2 ビット
   CCP1CONbits.P1M   = 0b00;   // シングル出力
   PSTRCONbits.STRA = 1;
