@@ -79,16 +79,8 @@ void PutsStringCPtr(char *str)
 unsigned short gcounter = 0;
 Queue queue;
 static unsigned char queue_buffer[32];
-int hangry = 0;
-int eaten = 0;
-unsigned char eated_raw = 0;
 int playing = 0;
 int waiting_data = 0;
-int miss = 0;
-int wrong = 0;
-int last_wrong = 0;
-unsigned char debug_buffer[32]; // size needs bigger than queue_buffer
-int debug_buffer_size = 0;
 
 
 #define T0CNT (65536-375)
@@ -112,24 +104,6 @@ void interrupt_func(void)
     //  //CCPR1L  = 63;
     //  CCPR1L  = 1;
     }
-
-    if (queue_size(&queue) > 0) {
-      unsigned char raw;
-      queue_dequeue(&queue, &raw, 1);
-      CCPR1L = (raw >> 2) & 0x3F;
-      CCP1CONbits.DC1B = (raw & 0x3);
-      //if (raw) {
-      //  CCPR1L = 0x3F;
-      //  CCP1CONbits.DC1B = 0b11;
-      //} else {
-      //  CCPR1L = 0;
-      //  CCP1CONbits.DC1B = 0;
-      //}
-      //} else {
-      //miss++;
-      if (raw != 0xFF && raw != 0)
-        miss++;
-    }
   }
 }
 
@@ -141,6 +115,7 @@ void init(void)
   PORTA = 0;
   PORTB = 0;
   PORTC = 0;
+  ANSELH = ANSEL = 0;
 
   // timer
   // USB Bootloader では 48MHz で動作
@@ -244,18 +219,6 @@ void APP_DeviceCDCBasicDemoInitialize()
 int debug_flag = 0;
 void APP_DeviceCDCBasicDemoTasks()
 {
-    {
-      if (last_wrong != wrong) {
-        writeBuffer[0] = 9;
-        writeBuffer[1] = debug_buffer_size;
-        memcpy(&writeBuffer[2], debug_buffer, debug_buffer_size);
-        last_wrong = wrong;
-        if (WaitToReadySerial())
-          putUSBUSART(writeBuffer, writeBuffer[1]+2);
-        WaitToReadySerial();
-      }
-    }
-
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
      */
