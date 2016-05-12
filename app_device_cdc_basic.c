@@ -136,7 +136,7 @@ void interrupt_func(void)
 void init(void)
 {
   TRISA = 0;
-  TRISB = 0;
+  TRISB = 0b11110000; // input RB5,RB7
   TRISC = 0;
   PORTA = 0;
   PORTB = 0;
