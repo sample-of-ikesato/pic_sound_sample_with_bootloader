@@ -81,6 +81,7 @@ Queue queue;
 static unsigned char queue_buffer[32];
 int playing = 0;
 int waiting_data = 0;
+int debug_flag = 0;
 
 
 #define T0CNT (65536-375)
@@ -92,8 +93,20 @@ void interrupt_func(void)
     INTCONbits.TMR0IF = 0;
     if (gcounter > 8000) {
       gcounter = 0;
-      PORTBbits.RB7 = !PORTBbits.RB7;
-      PORTCbits.RC2 = !PORTCbits.RC2;
+    }
+    //PORTCbits.RC7 = !PORTCbits.RC7;
+
+    PORTCbits.RC2 = !PORTCbits.RC2;
+    //PORTCbits.RC2 = 1;
+    if (gcounter & 0x01) {
+      //CCPR1L = 0x3F;
+      CCPR1L = 0x10;
+      CCP1CONbits.DC1B = 0b11;
+    } else {
+      //CCPR1L = 0x3F;
+      //CCP1CONbits.DC1B = 0b11;
+      CCPR1L = 0;
+      CCP1CONbits.DC1B = 0;
     }
   }
 }
@@ -139,7 +152,12 @@ void init(void)
 
 
   // PWM settings
-  CCP1CONbits.CCP1M = 0b0000; // PWM off
+  if (debug_flag) {
+    CCP1CONbits.CCP1M = 0b1100; // P1A、P1C をアクティブ High、P1B、P1D をアクティブ High
+  } else {
+    CCP1CONbits.CCP1M = 0b0000; // PWM off
+  }
+//CCP1CONbits.CCP1M = 0b0000; // PWM off
 //CCP1CONbits.CCP1M = 0b1100; // P1A、P1C をアクティブ High、P1B、P1D をアクティブ High
   CCP1CONbits.DC1B  = 0b11;   // デューティ サイクル値の最下位 2 ビット
   CCP1CONbits.P1M   = 0b00;   // シングル出力
@@ -208,9 +226,9 @@ void APP_DeviceCDCBasicDemoInitialize()
 * Output: None
 *
 ********************************************************************/
-int debug_flag = 0;
 void APP_DeviceCDCBasicDemoTasks()
 {
+    PORTCbits.RC7 = debug_flag;
     /* If the user has pressed the button associated with this demo, then we
      * are going to send a "Button Pressed" message to the terminal.
      */
@@ -226,7 +244,14 @@ void APP_DeviceCDCBasicDemoTasks()
             if(mUSBUSARTIsTxTrfReady() == true)
             {
                 putrsUSBUSART(buttonMessage);
-                buttonPressed = true;
+            }
+            buttonPressed = true;
+
+            debug_flag = !debug_flag;
+            if (debug_flag) {
+              CCP1CONbits.CCP1M = 0b1100;
+            } else {
+              CCP1CONbits.CCP1M = 0b0000;
             }
         }
     }
