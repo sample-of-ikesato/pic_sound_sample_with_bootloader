@@ -124,6 +124,8 @@ void init(void)
   PORTC = 0;
   ANSELH = ANSEL = 0;
 
+  PORTCbits.RC7 = 1;
+
   // timer
   // USB Bootloader では 48MHz で動作
   //

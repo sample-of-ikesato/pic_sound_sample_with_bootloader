@@ -86,7 +86,7 @@ MAIN_RETURN main(void)
         if( USBGetDeviceState() < CONFIGURED_STATE )
         {
             /* Jump back to the top of the while loop. */
-            continue;
+            //continue;
         }
 
         /* If we are currently suspended, then we need to see if we need to
@@ -96,7 +96,7 @@ MAIN_RETURN main(void)
         if( USBIsDeviceSuspended()== true )
         {
             /* Jump back to the top of the while loop. */
-            continue;
+            //continue;
         }
 
         //Application specific tasks
